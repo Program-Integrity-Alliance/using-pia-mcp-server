@@ -71,7 +71,7 @@ code .env  # VS Code
 ```
 
 **Required variables:**
-- `PIA_API_KEY` - Get from [https://mcp.programintegrity.org/get-api-key](https://mcp.programintegrity.org/get-api-key). If you don't have a PIA Community account, follow the links to create one
+- `PIA_API_KEY` - Go to [https://programintegrity.org/](https://programintegrity.org/), register for an account, then you can generate a key under top-right user > API/MCP Keys
 - `LLM_PROVIDER` - Choose: `openai`, `azure`, `claude`, or `huggingface`
 - Provider-specific API keys (see env.example for details)
 
