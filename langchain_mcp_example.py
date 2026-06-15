@@ -110,13 +110,13 @@ def create_llm(provider: str = "openai") -> Any:
 async def main():
     """Main execution function."""
     # Get configuration from environment
-    mcp_url = os.getenv("PIA_MCP_URL", "https://mcp.programintegrity.org")
+    mcp_url = os.getenv("PIA_MCP_URL", "https://www.programintegrity.org/mcp")
     mcp_api_key = os.getenv("PIA_API_KEY")
     llm_provider = os.getenv("LLM_PROVIDER", "openai").lower()
 
     if not mcp_api_key:
         print("❌ Error: PIA_API_KEY environment variable is required")
-        print("   Get an API key from: https://mcp.programintegrity.org/register")
+        print("   Get an API key from: https://www.programintegrity.org by registering for an account, logging in, and getting a key from your user profile")
         sys.exit(1)
 
     print("🚀 Starting LangChain MCP Example")
