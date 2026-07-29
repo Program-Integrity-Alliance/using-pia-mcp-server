@@ -128,7 +128,7 @@ AZURE_OPENAI_API_VERSION=2024-02-15-preview  # optional
 ```bash
 LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...your-anthropic-api-key...
-CLAUDE_MODEL=claude-3-5-sonnet-20241022  # optional
+ANTHROPIC_MODEL=claude-sonnet-4-5-20250929  # optional
 ```
 
 **Get API Key:** https://console.anthropic.com/
@@ -154,32 +154,44 @@ Note: Many Llama models do not support function calling through the HuggingFace 
 
 ## What the Example Does
 
-1. **Connects to PIA MCP Server** - Establishes HTTP connection to https://mcp.programintegrity.org
+1. **Connects to PIA MCP Server** - Establishes an HTTP connection to https://www.programintegrity.org/mcp
 2. **Initializes MCP Session** - Performs MCP protocol handshake
-3. **Discovers Tools** - Retrieves all available search tools (GAO, OIG, CRS, DOJ, Congress.gov, Executive Orders)
+3. **Discovers Tools** - Retrieves the available PIA tools (`pia_search` across every source — GAO, OIG, CRS, DOJ, Congress.gov, Federal Register — plus `pia_oversight_recommendations`)
 4. **Converts to LangChain Tools** - Wraps each MCP tool as a LangChain `StructuredTool`
 5. **Creates AI Agent** - Sets up a LangChain agent with your chosen LLM
 6. **Executes Queries** - Agent automatically selects and calls appropriate tools to answer questions
 
 ## Available MCP Tools
 
-The script automatically discovers these tools from the PIA MCP server:
+The script automatically discovers whatever tools the PIA MCP server currently
+offers at runtime, so it stays correct as the tool set evolves. Today the server
+exposes two tools:
 
-**General Search Tools:**
-- `pia_search_content` - Search document content and recommendations
-- `pia_search_content_facets` - Get available filter values
-- `pia_search_titles` - Search document titles only
+- **`pia_search`** — Search the full PIA database of government oversight reports,
+  recommendations, executive orders, legislation, and integrity data (GAO,
+  Oversight.gov/OIG, CRS, DOJ, Congress.gov, Federal Register). A single entry
+  point for all document search:
+  - **Scope** by source, dataset, agency, or date with the `filter` parameter (an
+    OData expression, e.g. `SourceDocumentDataSource eq 'GAO'`). This replaces the
+    former per-source tools — to search just one source, pass its
+    `SourceDocumentDataSource` filter.
+  - Choose full-text **content** vs. document **titles** with `search_mode`
+    (`content` or `titles`). Counts in `content` mode are text *chunks*, not whole
+    documents; use `titles` when you need a document/report count.
+  - Sweep **every source at once** with `wide=true`, or discover the available
+    filter values with `facets_only=true`.
 
-**Data Source-Specific Tools:**
-- `pia_search_content_gao` - GAO reports and recommendations
-- `pia_search_content_oig` - Oversight.gov (Inspector General reports)
-- `pia_search_content_crs` - Congressional Research Service reports
-- `pia_search_content_doj` - Department of Justice documents
-- `pia_search_content_congress` - Congress.gov legislation
-- `pia_search_content_executive_orders` - Federal Register executive orders
+- **`pia_oversight_recommendations`** — Search the Open Recommendations dataset
+  (GAO and Oversight.gov/OIG only), with facet breakdowns (status, priority,
+  agency, theme, GAO topic) enabled by default. Returns the count of open
+  recommendations plus a Rec Spotlight link for the full result set.
 
-**Utility Tools:**
-- `referenced_agencies` - Get list of agencies in database
+> **Migration note:** PIA previously exposed a set of narrower tools
+> (`pia_search_content`, `pia_search_titles`, `pia_search_content_gao`,
+> `pia_search_content_oig`, `pia_search_content_crs`, `referenced_agencies`, …).
+> These have been **consolidated into `pia_search`** — use its `filter`,
+> `search_mode`, `wide`, and `facets_only` parameters instead of the old
+> per-source tools. If your code hard-coded the old names, switch to `pia_search`.
 
 ## Example Queries
 
@@ -263,13 +275,27 @@ pwd  # Should show: .../pia-mcp/examples
 
 **Problem:** `Connection timeout` or `Connection refused`
 ```bash
-# Check your internet connection
-curl https://mcp.programintegrity.org/health
+# Check your internet connection, then verify the server is reachable.
+# A POST without an API key should return HTTP 403 with an
+# "API key required in x-api-key header" message — that response confirms
+# connectivity (you just need a valid key).
+curl -sS -X POST https://www.programintegrity.org/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
 
 # Verify the PIA_MCP_URL in your .env file:
 cat .env | grep PIA_MCP_URL
-# Should show: PIA_MCP_URL=https://mcp.programintegrity.org
+# Should show: PIA_MCP_URL=https://www.programintegrity.org/mcp
 ```
+
+**Problem:** `403` / `API key required`
+- Your `PIA_API_KEY` is missing or invalid. Generate a fresh key at
+  https://www.programintegrity.org (account menu, top-right → **API/MCP key**)
+  and make sure it's set in `.env`.
+- Use the `www.` host exactly — `https://www.programintegrity.org/mcp`. The bare
+  apex `programintegrity.org/mcp` issues a redirect that strips the `x-api-key`
+  header, so auth will fail.
 
 ### Import Errors
 
@@ -295,8 +321,8 @@ Edit your `.env` file to use different models:
 # OpenAI - use GPT-4 Turbo
 OPENAI_MODEL=gpt-4-turbo
 
-# Claude - use Claude Opus
-CLAUDE_MODEL=claude-3-opus-20240229
+# Claude - use a different Anthropic model
+ANTHROPIC_MODEL=claude-opus-4-1-20250805
 
 # Hugging Face - use Mistral
 HUGGINGFACE_MODEL=mistralai/Mistral-7B-Instruct-v0.2
@@ -314,7 +340,7 @@ LLM_PROVIDER=openai
 LLM_PROVIDER=azure
 
 # To use Claude:
-LLM_PROVIDER=claude
+LLM_PROVIDER=anthropic
 ```
 
 Then run the script again - no code changes needed!
@@ -329,7 +355,11 @@ Edit `langchain_mcp_example.py` to customize:
 ## Getting API Keys
 
 ### PIA MCP Server (Required)
-Register at: https://mcp.programintegrity.org/register
+Register for a free PIA Community account at https://www.programintegrity.org,
+then generate a key from the account menu (top-right) → **API/MCP key**. Send it
+in the `x-api-key` header (or as a Bearer token) when connecting to
+`https://www.programintegrity.org/mcp`. See
+https://www.programintegrity.org/connect for a full walkthrough.
 
 ### LLM Providers (Choose One)
 - **OpenAI**: https://platform.openai.com/api-keys
@@ -372,7 +402,7 @@ deactivate
 
 ## Support
 
-- **Main Documentation**: See [../README.md](../README.md) for PIA MCP Server documentation
+- **Main Documentation**: See the [PIA Connect page](https://www.programintegrity.org/connect) for full MCP setup instructions
 - **Issues**: Open an issue on the GitHub repository
 - **Questions**: Check the troubleshooting section above
 

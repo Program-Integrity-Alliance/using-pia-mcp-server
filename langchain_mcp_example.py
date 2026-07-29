@@ -103,7 +103,7 @@ def create_llm(provider: str = "openai") -> Any:
 
     else:
         raise ValueError(
-            f"Unknown provider: {provider}. Use 'openai', 'azure', 'claude', or 'huggingface'"
+            f"Unknown provider: {provider}. Use 'openai', 'azure', 'anthropic', or 'huggingface'"
         )
 
 
